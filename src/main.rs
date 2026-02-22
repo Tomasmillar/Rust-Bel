@@ -9,7 +9,7 @@ fn main() {
 
     let mut machine = Machine::new(
         100_000_000, // 100M cons cell capacity
-        1_000_000_000, // 1 billion step limit
+        u64::MAX, // no step limit — use Ctrl+C to interrupt
     )
     .expect("Failed to initialize machine");
 
