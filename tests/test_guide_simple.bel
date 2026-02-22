@@ -1,0 +1,308 @@
+; Guide examples test suite (fast subset)
+; Run with: bel --load bel.bel < tests/test_guide_simple.bel
+;
+; Each expression is followed by "; expect: <result>" so the test
+; runner can verify correctness automatically.
+;
+; Tests involving character-code arithmetic, symbol comparison, sort
+; with >2 elements, floor/ceil/round are too slow with unary numbers.
+
+; === Primitives (17 tests) ===
+(quote a)
+; expect: a
+(id 'a 'a)
+; expect: t
+(id 'a 'b)
+; expect: nil
+(id '(a b) '(a b))
+; expect: nil
+(join 'a 'b)
+; expect: (a . b)
+(join 'a)
+; expect: (a)
+(id (join 'a 'b) (join 'a 'b))
+; expect: nil
+(car '(a . b))
+; expect: a
+(car '(a b))
+; expect: a
+(car nil)
+; expect: nil
+(cdr '(a . b))
+; expect: b
+(cdr '(a b))
+; expect: (b)
+(type 'a)
+; expect: symbol
+(type '(a))
+; expect: pair
+(type \a)
+; expect: char
+(sym "foo")
+; expect: foo
+(nom 'foo)
+; expect: "foo"
+
+; === Literals and apply (4 tests) ===
+(lit a)
+; expect: (lit a)
+(apply join '(a b))
+; expect: (a . b)
+(apply join 'a '(b))
+; expect: (a . b)
+(join)
+; expect: (nil)
+
+; === Core functions (22 tests) ===
+(no nil)
+; expect: t
+(no 'a)
+; expect: nil
+(atom \a)
+; expect: t
+(atom nil)
+; expect: t
+(atom 'a)
+; expect: t
+(atom '(a))
+; expect: nil
+(all atom '(a b))
+; expect: t
+(all atom nil)
+; expect: t
+(all atom '(a (b c) d))
+; expect: nil
+(some atom '((a b) (c d)))
+; expect: nil
+(some atom '((a b) c (d e)))
+; expect: (c (d e))
+(reduce join '(a b c))
+; expect: (a b . c)
+(cons 'a '(b c))
+; expect: (a b c)
+(cons 'a 'b 'c '(d e f))
+; expect: (a b c d e f)
+(append '(a b c) '(d e f))
+; expect: (a b c d e f)
+(append '(a) nil '(b c) '(d e f))
+; expect: (a b c d e f)
+(snoc '(a b c) 'd 'e)
+; expect: (a b c d e)
+(list)
+; expect: nil
+(list 'a)
+; expect: (a)
+(list 'a 'b)
+; expect: (a b)
+(map car '((a b) (c d) (e f)))
+; expect: (a c e)
+(map cons '(a b c) '(1 2 3))
+; expect: ((a . 1) (b . 2) (c . 3))
+
+; === Closures (1 test) ===
+((lit clo ((x . a)) (y) (cons x y)) 'b)
+; expect: (a . b)
+
+; === Let and binding (2 tests) ===
+(let x 'a (cons x 'b))
+; expect: (a . b)
+(let (x . y) '(a b c) (list x y))
+; expect: (a (b c))
+
+; === Or (2 tests) ===
+(apply or '(nil nil))
+; expect: nil
+(apply or '(nil a b))
+; expect: a
+
+; === Equality and predicates (8 tests) ===
+(= '(a b) '(a b))
+; expect: t
+(proper nil)
+; expect: t
+(proper '(a . b))
+; expect: nil
+(proper '(a b))
+; expect: t
+(string "foo")
+; expect: t
+(mem 'b '(a b c))
+; expect: (b c)
+(mem 'e '(a b c))
+; expect: nil
+(mem \a "foobar")
+; expect: "ar"
+
+; === Optional params (2 tests) ===
+((fn (x (o y)) y) 'a)
+; expect: nil
+((fn (x (o y 'b)) y) 'a)
+; expect: b
+
+; === Conditional binding (2 tests) ===
+(iflet x nil 'foo '(a b c) (car x) 'bar)
+; expect: a
+(map (fn (x) (aif (cdr x) (car it))) '((a) (b c) (d e f) (g)))
+; expect: (nil c e nil)
+
+; === Search (2 tests) ===
+(begins '(a b c d e) '(a b))
+; expect: t
+(caris '(a b) 'a)
+; expect: t
+
+; === Hug (1 test) ===
+(hug '(a b c d e))
+; expect: ((a b) (c d) (e))
+
+; === With (2 tests) ===
+(with (x 'a y 'b) (cons x y))
+; expect: (a . b)
+(let x 'a (with (x 'b y x) y))
+; expect: a
+
+; === Filter (2 tests) ===
+(keep odd '(1 2 3 4 5))
+; expect: (1 3 5)
+(rem \a "abracadabra")
+; expect: "brcdbr"
+
+; === List ops (8 tests) ===
+(rev "able")
+; expect: "elba"
+(snap '(a b) '(1 2 3 4 5))
+; expect: ((1 2) (3 4 5))
+(udrop '(a b) '(1 2 3 4 5))
+; expect: (3 4 5)
+(map idfn '(a b c))
+; expect: (a b c)
+((is 'a) 'a)
+; expect: t
+((isa 'clo) map)
+; expect: t
+(map function (list car append 'foo))
+; expect: (prim clo nil)
+(map (con 'yo) '(a b c))
+; expect: (yo yo yo)
+
+; === Compose (3 tests) ===
+((compose car cdr) '(a b c))
+; expect: b
+(car:cdr '(a b c))
+; expect: b
+(map ~cdr '((a) (a b c) (a b)))
+; expect: (t nil nil)
+
+; === Combine (3 tests) ===
+(map ((combine and) car cdr) '((a . nil) (a . b) (nil . b)))
+; expect: (nil t nil)
+((cand pair cdr) '(a b))
+; expect: (b)
+((cor char pair) 'a)
+; expect: nil
+
+; === Upon (1 test) ===
+(map (upon '(a b c)) (list car cadr cdr))
+; expect: (a b (b c))
+
+; === Fuse (1 test) ===
+(fuse [list 'a _] '(1 2 3))
+; expect: (a 1 a 2 a 3)
+
+; === Small number arithmetic (7 tests) ===
+(+ 1 2)
+; expect: 3
+(- 3 1)
+; expect: 2
+(* 2 3)
+; expect: 6
+(< 1 2)
+; expect: t
+(> 1 2)
+; expect: nil
+(= 1 1)
+; expect: t
+(+ 8 5)
+; expect: 13
+
+; === Extended arithmetic (10 tests) ===
+(+ 1 2 3 4 5)
+; expect: 15
+(- 10 3)
+; expect: 7
+(* 4 5)
+; expect: 20
+(/ 10 2)
+; expect: 5
+(+ 1/2 1/3)
+; expect: 5/6
+(* 100 100)
+; expect: 10000
+(sort < '(3 1 4 1 5 9 2 6))
+; expect: (1 1 2 3 4 5 6 9)
+(best < '(5 2 8 1 9))
+; expect: 1
+(len "hello world")
+; expect: 11
+(rem 1 '(1 2 1 3 1))
+; expect: (2 3)
+
+; === Error handling (5 tests) ===
+(eif x (car 'a) 'oops x)
+; expect: oops
+(eif x (car '(a b)) 'oops x)
+; expect: a
+(onerr 'oops (car 'a))
+; expect: oops
+(safe (car '(a b)))
+; expect: a
+(safe (car 'a))
+; expect: nil
+
+; === Type predicates (2 tests) ===
+; NOTE: guide says (t t t) but nil's globe binding leaks through literal.
+; This is a known issue — nil should be recognized as self-evaluating.
+(map literal (list nil "foo" car))
+; expect: (t t t)
+(map variable (list 'x (uvar) t))
+; expect: (t t nil)
+
+; === Misc (2 tests) ===
+(consif (cadr '(a)) '(x y))
+; expect: (x y)
+(let x 'a (withs (x 'b y x) y))
+; expect: b
+
+; === Dynamic binding (3 tests) ===
+(dyn x 'a (do (set x 'b) x))
+; expect: b
+(dyn x 'z (join x 'b))
+; expect: (z . b)
+(dyn x 'a x)
+; expect: a
+
+; === Place expressions (3 tests) ===
+(let x '(a b c) (do (set (car x) 'z) x))
+; expect: (z b c)
+(let x '(a b c) (do (set (cadr x) 'z) x))
+; expect: (a z c)
+(let x '(a b c) (do (set (cdr x) '(y z)) x))
+; expect: (a y z)
+
+; === Structural (4 tests) ===
+(append '(a b c) 5)
+; expect: (a b c . 5)
+(cons 'a 5)
+; expect: (a . 5)
+(adjoin 'a '(a b c))
+; expect: (a b c)
+(adjoin 'z '(a b c))
+; expect: (z a b c)
+
+; === Flip/part/trap (3 tests) ===
+((flip cons) 'a 'b)
+; expect: (b . a)
+((part cons 'a) 'b)
+; expect: (a . b)
+((trap cons 'a) 'b)
+; expect: (b . a)

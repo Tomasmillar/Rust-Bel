@@ -1,0 +1,8 @@
+[package]
+name = "bel"
+version = "0.1.0"
+edition = "2021"
+description = "A faithful interpreter for Paul Graham's Bel programming language"
+
+[dependencies]
+rand = "0.8"

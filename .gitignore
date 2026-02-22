@@ -1,0 +1,8 @@
+/target
+.claude
+
+# Temporary debug/output files
+err.txt
+out.txt
+trace_*.txt
+nul
