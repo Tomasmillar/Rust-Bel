@@ -1,4 +1,6 @@
-# Bel
+# Rust-Bel
+
+Built alongside Claude Opus 4.6.
 
 A faithful interpreter for Paul Graham's [Bel](https://paulgraham.com/bel.html) programming language, written in Rust.
 
@@ -295,7 +297,7 @@ tests/
 
 Bel was released by Paul Graham in October 2019 as a formal specification — a language defined in itself, not a runnable system. Several implementations exist in Perl, Haskell, Clojure, C, and other languages, but most reimplement `bel.bel`'s definitions natively in the host language rather than loading the file directly.
 
-This is one of the few implementations that loads the unmodified `bel.bel` and provides all 7 special forms, including `ccc` (continuations) and `thread` (green threads) — two features that many implementations omit despite being part of the axiomatic foundation.
+This is one of the few implementations that loads the unmodified `bel.bel` and provides all 7 special forms, including `ccc` (continuations) and `thread` (green threads).
 
 The goal is fidelity, not speed. A future stage 2 could explore optimizations discovered by observing the running spec, verified against `bel.bel` as the permanent authority.
 
