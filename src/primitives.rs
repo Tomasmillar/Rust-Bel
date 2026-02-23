@@ -68,7 +68,7 @@ pub fn call_primitive(
     } else if name == sym::CDR {
         prim_cdr(a, heap)
     } else if name == sym::TYPE {
-        prim_type(a, heap)
+        prim_type(a)
     } else if name == sym::XAR {
         prim_xar(a, b, heap)
     } else if name == sym::XDR {
@@ -125,35 +125,10 @@ fn prim_cdr(a: BelValue, heap: &Heap) -> BelResult<BelValue> {
 
 /// (type x) — return the type symbol: symbol, pair, char, stream.
 /// nil is a symbol.
-/// For pairs of the form (lit tag ...) where tag is mac, clo, prim, or cont,
-/// returns the tag instead of pair.
-fn prim_type(a: BelValue, heap: &Heap) -> BelResult<BelValue> {
+fn prim_type(a: BelValue) -> BelResult<BelValue> {
     let type_sym = match a {
         BelValue::Nil | BelValue::Symbol(_) => sym::SYMBOL,
-        BelValue::Pair(id) => {
-            let car = heap.car(id);
-            if car == BelValue::Symbol(sym::LIT) {
-                let cdr = heap.cdr(id);
-                if let BelValue::Pair(cdr_id) = cdr {
-                    let tag = heap.car(cdr_id);
-                    match tag {
-                        BelValue::Symbol(s)
-                            if s == sym::MAC
-                                || s == sym::CLO
-                                || s == sym::PRIM
-                                || s == sym::CONT =>
-                        {
-                            s
-                        }
-                        _ => sym::PAIR,
-                    }
-                } else {
-                    sym::PAIR
-                }
-            } else {
-                sym::PAIR
-            }
-        }
+        BelValue::Pair(_) => sym::PAIR,
         BelValue::Char(_) => sym::CHAR,
         BelValue::Stream(_) => sym::STREAM,
     };
