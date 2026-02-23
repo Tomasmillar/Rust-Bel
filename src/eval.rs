@@ -2844,6 +2844,11 @@ impl Machine {
         // Set the global
         env_set(name, clo, &mut self.globe, &mut self.heap)?;
 
+        // If this name was a bootstrap form, remove it so the definition takes effect.
+        if self.lookup_form(name).is_some() {
+            self.remove_form(name);
+        }
+
         Ok(EvalResult::Continue {
             s,
             r: self.cons_onto(name, r)?,
@@ -2896,6 +2901,11 @@ impl Machine {
         let mac_val = BelValue::Pair(mac);
 
         env_set(name, mac_val, &mut self.globe, &mut self.heap)?;
+
+        // If this name was a bootstrap form, remove it so the macro takes effect.
+        if self.lookup_form(name).is_some() {
+            self.remove_form(name);
+        }
 
         Ok(EvalResult::Continue {
             s,
