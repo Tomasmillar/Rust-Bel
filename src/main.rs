@@ -1,8 +1,12 @@
 use std::io::{self, BufRead, IsTerminal, Read, Write};
+use std::time::Instant;
 
 use bel::eval::Machine;
+use bel::heap::Heap;
 use bel::printer;
 use bel::reader;
+use bel::symbol::SymbolTable;
+use bel::value::BelValue;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -92,7 +96,38 @@ fn main() {
     }
 }
 
-/// Load a file silently (used for --load bel.bel).
+/// Try to extract definition info from a parsed expression.
+/// Returns (form, name) like ("def", "no") or ("mac", "fn") or ("set", "vmark").
+fn extract_def_name(expr: BelValue, heap: &Heap, symbols: &SymbolTable) -> Option<(String, String)> {
+    let pair_id = expr.as_pair()?;
+    let form_sym = heap.car(pair_id).as_symbol()?;
+    let form_name = symbols.name(form_sym).to_string();
+
+    if form_name != "def" && form_name != "mac" && form_name != "set" {
+        return None;
+    }
+
+    let cdr = heap.cdr(pair_id);
+    let cdr_pair = cdr.as_pair()?;
+    let name_sym = heap.car(cdr_pair).as_symbol()?;
+    let def_name = symbols.name(name_sym).to_string();
+
+    Some((form_name, def_name))
+}
+
+/// Load a Bel source file with progress reporting.
+///
+/// The bootstrap process:
+///   Rust provides 16 primitives (id, join, car, cdr, ...) and 7 axiomatic
+///   special forms (quote, if, where, dyn, after, ccc, thread) that are
+///   always native. It also provides 6 temporary bootstrap forms (set, def,
+///   fn, mac, do, let) — just enough to start evaluating bel.bel.
+///
+///   As bel.bel loads, it redefines fn/do/let/def/mac early on, then builds
+///   the full evaluator, resets the forms table (replacing the native special
+///   forms with Bel closures), redefines set last, and finally loads the
+///   reader/printer. After loading, everything runs through bel.bel — only
+///   the 16 primitives remain as native Rust.
 fn load_file(machine: &mut Machine, path: &str) {
     let input = match std::fs::read_to_string(path) {
         Ok(s) => s,
@@ -102,16 +137,62 @@ fn load_file(machine: &mut Machine, path: &str) {
         }
     };
 
-    eprint!("Loading {}...", path);
+    let start = Instant::now();
+    eprintln!("Loading {}", path);
+    eprintln!(
+        "  Bootstrap: 16 primitives + 7 native forms + 6 temporary forms (set, def, fn, mac, do, let)"
+    );
+    eprintln!("  [1/9] Base utilities (bootstrap: evaluating with native set, def, fn)...");
 
     let mut pos = 0;
     let mut count = 0;
+    let mut phase = 1u32;
     loop {
         let result = reader::read_one_at(&input, pos, &mut machine.heap, &mut machine.symbols);
         match result {
             Ok(Some((expr, new_pos))) => {
                 pos = new_pos;
                 count += 1;
+
+                // Detect phase transitions by inspecting the definition name
+                if let Some((form, name)) = extract_def_name(expr, &machine.heap, &machine.symbols) {
+                    if phase < 2 && form == "mac" && name == "fn" {
+                        phase = 2;
+                        eprintln!(
+                            "  [2/9] Replacing bootstrap fn, do, let, def, mac with bel.bel macros..."
+                        );
+                    } else if phase < 3 && form == "def" && name == "=" {
+                        phase = 3;
+                        eprintln!(
+                            "  [3/9] Core language (bootstrap: still using native set, quote, if)..."
+                        );
+                    } else if phase < 4 && form == "def" && name == "bel" {
+                        phase = 4;
+                        eprintln!(
+                            "  [4/9] Metacircular evaluator (bel, mev, ev, evcall, applylit)..."
+                        );
+                    } else if phase < 5 && form == "set" && name == "forms" {
+                        phase = 5;
+                        eprintln!(
+                            "  [5/9] Resetting forms table -- native quote/if/where/dyn/after/ccc/thread replaced by bel.bel closures..."
+                        );
+                    } else if phase < 6 && form == "def" && name == "con" {
+                        phase = 6;
+                        eprintln!("  [6/9] Higher-order functions (compose, combine, fold)...");
+                    } else if phase < 7 && form == "set" && name == "i0" {
+                        phase = 7;
+                        eprintln!("  [7/9] Number tower (integer, rational, complex arithmetic)...");
+                    } else if phase < 8 && form == "mac" && name == "set" {
+                        phase = 8;
+                        eprintln!(
+                            "  [8/9] Replacing bootstrap set -- last native bootstrap form removed..."
+                        );
+                    } else if phase < 9 && form == "def" && name == "read" {
+                        phase = 9;
+                        eprintln!("  [9/9] Reader & printer...");
+                    }
+                }
+
                 match machine.eval(expr) {
                     Ok(_) => {}
                     Err(e) => {
@@ -128,7 +209,16 @@ fn load_file(machine: &mut Machine, path: &str) {
         }
     }
 
-    eprintln!(" done ({} expressions)", count);
+    let elapsed = start.elapsed();
+    eprintln!(
+        "  Loaded {} expressions in {:.2}s ({} symbols interned)",
+        count,
+        elapsed.as_secs_f64(),
+        machine.symbols.count()
+    );
+    eprintln!(
+        "  All bootstrap forms replaced. Running on bel.bel (16 primitives remain native)."
+    );
 }
 
 /// Interactive REPL: accumulate lines until parens are balanced.
